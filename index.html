@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Star Forge</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/flowbite@2.3.0/dist/flowbite.min.css" rel="stylesheet">
+  <style>
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 20px rgba(251, 191, 36, 0.4); }
+      50%       { box-shadow: 0 0 40px rgba(251, 191, 36, 0.8); }
+    }
+    .star-btn { animation: pulse-glow 2s ease-in-out infinite; }
+    .star-btn:active { transform: scale(0.95); }
+  </style>
+</head>
+<body class="text-white min-h-screen" style="background: linear-gradient(to bottom right, #0f2027, #203a43, #2c5364);">
+
+  <!-- ═══ CLICKER VIEW ═══════════════════════════════════════════════════════ -->
+  <div id="view-clicker" class="flex flex-col items-center justify-center min-h-screen gap-10 px-6">
+
+    <h1 class="text-4xl font-bold text-yellow-400 tracking-wide">⭐ Star Forge</h1>
+
+    <!-- Energy display -->
+    <div class="text-center">
+      <div class="text-6xl font-extrabold text-yellow-300 tabular-nums" id="energy-display">0</div>
+      <div class="text-lg text-gray-400 mt-2">
+        <span id="eps-display" class="text-yellow-500">0.0</span>/s
+      </div>
+    </div>
+
+    <!-- Big star button -->
+    <button
+      onclick="handleClick()"
+      class="star-btn w-56 h-56 rounded-full bg-gradient-to-br from-yellow-400 to-amber-600
+             text-8xl flex items-center justify-center shadow-xl
+             transition hover:scale-110 active:scale-95 cursor-pointer select-none"
+      aria-label="Click to forge energy"
+    >
+      🌟
+    </button>
+
+    <!-- Shop button -->
+    <button
+      onclick="showShop()"
+      class="mt-4 px-10 py-4 rounded-2xl bg-slate-700 hover:bg-slate-600 active:scale-95
+             text-xl font-bold text-white shadow-lg transition"
+    >
+      🛒 Shop
+    </button>
+
+  </div>
+
+  <!-- ═══ SHOP VIEW ══════════════════════════════════════════════════════════ -->
+  <div id="view-shop" class="hidden flex-col min-h-screen px-6 py-8 max-w-2xl mx-auto gap-6">
+
+    <!-- Shop header -->
+    <div class="flex items-center justify-between">
+      <button
+        onclick="showClicker()"
+        class="px-5 py-3 rounded-2xl bg-slate-700 hover:bg-slate-600 active:scale-95
+               text-base font-bold text-white shadow-lg transition"
+      >
+        ← Back
+      </button>
+      <h2 class="text-3xl font-bold text-yellow-400">🛒 Shop</h2>
+      <div class="text-right">
+        <div class="text-xl font-bold text-yellow-300 tabular-nums" id="energy-display-shop">0</div>
+        <div class="text-sm text-gray-400"><span id="eps-display-shop" class="text-yellow-500">0.0</span>/s</div>
+      </div>
+    </div>
+
+    <!-- Upgrade cards -->
+    <div id="shop" class="flex flex-col gap-3 flex-1 overflow-y-auto"></div>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/flowbite@2.3.0/dist/flowbite.min.js"></script>
+  <script>
+    // ─── Upgrades config ───────────────────────────────────────────────────────
+    const UPGRADES = [
+      { name: "Solar Panel",       cost: 10,          perSecond: 0.1,     emoji: "🔆" },
+      { name: "Photon Rain",       cost: 50,          perSecond: 0.5,     emoji: "🌧️"  },
+      { name: "Star Miner",        cost: 100,         perSecond: 1,       emoji: "⛏️"  },
+      { name: "Warp Drive",        cost: 500,         perSecond: 2,       emoji: "🚀" },
+      { name: "Starfall Echo",     cost: 2_000,       perSecond: 8,       emoji: "🌠" },
+      { name: "Gravity Whirlpool", cost: 8_000,       perSecond: 30,      emoji: "🌀" },
+      { name: "Nebula Bloomstorm", cost: 30_000,      perSecond: 100,     emoji: "🌸" },
+      { name: "Dark Matter Tide",  cost: 120_000,     perSecond: 350,     emoji: "🌊" },
+      { name: "Time Fracture",     cost: 500_000,     perSecond: 1_200,   emoji: "⏳" },
+      { name: "Magnetar Singing",  cost: 2_000_000,   perSecond: 4_000,   emoji: "🎵" },
+      { name: "Void Lightning",    cost: 8_000_000,   perSecond: 13_000,  emoji: "⚡" },
+      { name: "Comet Garden",      cost: 35_000_000,  perSecond: 45_000,  emoji: "☄️" },
+      { name: "Aurora Planet",     cost: 150_000_000, perSecond: 150_000, emoji: "🪐" },
+    ];
+
+    // ─── Game state ────────────────────────────────────────────────────────────
+    let energy = 0;
+    let energyPerSecond = 0;
+    const owned = UPGRADES.map(() => 0);
+
+    // ─── View navigation ───────────────────────────────────────────────────────
+    function showShop() {
+      document.getElementById("view-clicker").classList.add("hidden");
+      document.getElementById("view-shop").classList.remove("hidden");
+      document.getElementById("view-shop").classList.add("flex");
+    }
+
+    function showClicker() {
+      document.getElementById("view-shop").classList.add("hidden");
+      document.getElementById("view-shop").classList.remove("flex");
+      document.getElementById("view-clicker").classList.remove("hidden");
+    }
+
+    // ─── handleClick ───────────────────────────────────────────────────────────
+    function handleClick() {
+      energy += 1;
+      updateDisplay();
+    }
+
+    // ─── buyUpgrade ────────────────────────────────────────────────────────────
+    function buyUpgrade(index) {
+      const upgrade = UPGRADES[index];
+      if (energy < upgrade.cost) return;
+      energy -= upgrade.cost;
+      owned[index] += 1;
+      recalcEPS();
+      updateDisplay();
+    }
+
+    // ─── recalcEPS ─────────────────────────────────────────────────────────────
+    function recalcEPS() {
+      energyPerSecond = UPGRADES.reduce(
+        (sum, u, i) => sum + owned[i] * u.perSecond, 0
+      );
+    }
+
+    // ─── tick ──────────────────────────────────────────────────────────────────
+    function tick() {
+      if (energyPerSecond > 0) {
+        energy += energyPerSecond / 10;
+        updateDisplay();
+      }
+    }
+
+    // ─── updateDisplay ─────────────────────────────────────────────────────────
+    // Updates both views' energy/EPS counters and the shop buttons.
+    function updateDisplay() {
+      const val = Math.floor(energy).toLocaleString();
+      const eps = energyPerSecond.toFixed(1);
+      document.getElementById("energy-display").textContent      = val;
+      document.getElementById("energy-display-shop").textContent = val;
+      document.getElementById("eps-display").textContent         = eps;
+      document.getElementById("eps-display-shop").textContent    = eps;
+
+      UPGRADES.forEach((u, i) => {
+        const btn   = document.getElementById(`buy-btn-${i}`);
+        const badge = document.getElementById(`owned-badge-${i}`);
+        if (btn)   btn.disabled = energy < u.cost;
+        if (badge) badge.textContent = owned[i];
+      });
+    }
+
+    // ─── renderShop ────────────────────────────────────────────────────────────
+    function renderShop() {
+      document.getElementById("shop").innerHTML = UPGRADES.map((u, i) => `
+        <div class="flex items-center justify-between bg-white/5 border border-white/10
+                    rounded-2xl px-4 py-4 gap-4">
+          <div class="flex items-center gap-3 min-w-0">
+            <span class="text-4xl">${u.emoji}</span>
+            <div>
+              <div class="font-semibold text-gray-100 text-base">${u.name}</div>
+              <div class="text-xs text-gray-400">
+                +${u.perSecond}/s &nbsp;&middot;&nbsp;
+                <span class="text-yellow-400">&#x26A1; ${u.cost.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+          <span id="owned-badge-${i}"
+                class="inline-flex items-center justify-center w-9 h-9 rounded-full
+                       bg-slate-700 text-yellow-300 font-bold text-sm flex-shrink-0">
+            0
+          </span>
+          <button
+            id="buy-btn-${i}"
+            onclick="buyUpgrade(${i})"
+            disabled
+            class="flex-shrink-0 px-5 py-3 rounded-xl font-bold text-sm
+                   bg-yellow-500 hover:bg-yellow-400 text-gray-950
+                   disabled:opacity-40 disabled:cursor-not-allowed transition"
+          >
+            Buy
+          </button>
+        </div>
+      `).join("");
+    }
+
+    // ─── Spacebar shortcut ─────────────────────────────────────────────────────
+    document.addEventListener("keydown", (e) => {
+      if (e.code === "Space" && e.target === document.body) {
+        e.preventDefault();
+        handleClick();
+      }
+    });
+
+    // ─── Save / Load ───────────────────────────────────────────────────────────
+    function saveGame() {
+      localStorage.setItem("starforge_save", JSON.stringify({ energy, owned }));
+    }
+
+    function loadGame() {
+      const raw = localStorage.getItem("starforge_save");
+      if (!raw) return;
+      const save = JSON.parse(raw);
+      energy = save.energy ?? 0;
+      save.owned.forEach((n, i) => { if (i < owned.length) owned[i] = n; });
+      recalcEPS();
+    }
+
+    // ─── Init ──────────────────────────────────────────────────────────────────
+    loadGame();
+    renderShop();
+    updateDisplay();
+    setInterval(tick, 100);
+    setInterval(saveGame, 10_000);
+    window.addEventListener("beforeunload", saveGame);
+  </script>
+</body>
+</html>
