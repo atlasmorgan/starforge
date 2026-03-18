@@ -95,6 +95,10 @@
       { name: "Aurora Planet",     cost: 150_000_000, perSecond: 150_000, emoji: "🪐" },
     ];
 
+    // ─── Audio ─────────────────────────────────────────────────────────────────
+    const clickSound = new Audio("assets/click.mp3");
+    const chaChingSound = new Audio("assets/cha-ching.mp3");
+
     // ─── Game state ────────────────────────────────────────────────────────────
     let energy = 0;
     let energyPerSecond = 0;
@@ -115,6 +119,8 @@
 
     // ─── handleClick ───────────────────────────────────────────────────────────
     function handleClick() {
+      clickSound.currentTime = 0;
+      clickSound.play();
       energy += 1;
       updateDisplay();
     }
@@ -123,6 +129,8 @@
     function buyUpgrade(index) {
       const upgrade = UPGRADES[index];
       if (energy < upgrade.cost) return;
+      chaChingSound.currentTime = 0;
+      chaChingSound.play();
       energy -= upgrade.cost;
       owned[index] += 1;
       recalcEPS();
