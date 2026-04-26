@@ -6,6 +6,8 @@
   <title>Star Forge</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/flowbite@2.3.0/dist/flowbite.min.css" rel="stylesheet">
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <style>
     * { touch-action: manipulation; }
     @keyframes pulse-glow {
@@ -14,14 +16,44 @@
     }
     .star-btn { animation: pulse-glow 2s ease-in-out infinite; }
     .star-btn:active { transform: scale(0.95); }
+    #username-modal {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+      display: flex; align-items: center; justify-content: center; z-index: 50;
+    }
+    #username-modal.hidden { display: none; }
+    .lb-gold   { color: #fbbf24; }
+    .lb-silver { color: #94a3b8; }
+    .lb-bronze { color: #b45309; }
   </style>
 </head>
 <body class="text-white min-h-screen" style="background: linear-gradient(to bottom right, #0f2027, #203a43, #2c5364);">
 
+  <!-- ═══ USERNAME MODAL ════════════════════════════════════════════════════ -->
+  <div id="username-modal" class="hidden">
+    <div class="bg-slate-800 border border-white/10 rounded-2xl px-8 py-8 flex flex-col items-center gap-5 shadow-2xl max-w-xs w-full mx-4">
+      <div class="text-3xl">⭐</div>
+      <h2 class="text-xl font-bold text-yellow-400 text-center">Choose your name</h2>
+      <p class="text-sm text-gray-400 text-center">This will appear on the leaderboard.</p>
+      <input
+        id="username-input"
+        type="text"
+        maxlength="20"
+        placeholder="Your name..."
+        class="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder-gray-500 text-center focus:outline-none focus:border-yellow-400"
+      />
+      <button
+        onclick="confirmUsername()"
+        class="w-full py-3 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-gray-950 font-bold transition"
+      >
+        Start Forging
+      </button>
+    </div>
+  </div>
+
   <!-- ═══ CLICKER VIEW ═══════════════════════════════════════════════════════ -->
   <div id="view-clicker" class="flex flex-col items-center justify-center min-h-screen gap-10 px-6">
 
-    <h1 class="text-4xl font-bold text-yellow-400 tracking-wide">⭐ Star Forge</h1>
+    <h1 class="text-4xl font-bold text-yellow-400 tracking-wide">⭐ Star Forge ⭐️</h1>
 
     <!-- Energy display -->
     <div class="text-center">
@@ -42,14 +74,23 @@
       🌟
     </button>
 
-    <!-- Shop button -->
-    <button
-      onclick="showShop()"
-      class="mt-4 px-10 py-4 rounded-2xl bg-slate-700 hover:bg-slate-600 active:scale-95
-             text-xl font-bold text-white shadow-lg transition"
-    >
-      🛒 Shop
-    </button>
+    <!-- Shop + Leaderboard buttons -->
+    <div class="flex gap-4 mt-4">
+      <button
+        onclick="showShop()"
+        class="px-8 py-4 rounded-2xl bg-slate-700 hover:bg-slate-600 active:scale-95
+               text-xl font-bold text-white shadow-lg transition"
+      >
+        🛒 Shop
+      </button>
+      <button
+        onclick="showLeaderboard()"
+        class="px-8 py-4 rounded-2xl bg-slate-700 hover:bg-slate-600 active:scale-95
+               text-xl font-bold text-white shadow-lg transition"
+      >
+        🏆 Ranks
+      </button>
+    </div>
 
     <!-- Rebirth section -->
     <div class="flex flex-col items-center gap-2">
@@ -89,6 +130,53 @@
     <!-- Upgrade cards -->
     <div id="shop" class="flex flex-col gap-3 flex-1 overflow-y-auto"></div>
 
+  </div>
+
+  <!-- ═══ LEADERBOARD VIEW ═════════════════════════════════════════════════ -->
+  <div id="view-leaderboard" class="hidden flex-col min-h-screen px-6 py-8 max-w-2xl mx-auto gap-6">
+    <div class="flex items-center justify-between">
+      <button
+        onclick="showClicker()"
+        class="px-5 py-3 rounded-2xl bg-slate-700 hover:bg-slate-600 active:scale-95
+               text-base font-bold text-white shadow-lg transition"
+      >
+        ← Back
+      </button>
+      <h2 class="text-3xl font-bold text-yellow-400">🏆 Leaderboard</h2>
+      <div class="text-right text-sm text-gray-400">
+        Energy/sec
+      </div>
+    </div>
+    <div id="leaderboard-list" class="flex flex-col gap-3"></div>
+    <p class="text-xs text-gray-500 text-center" id="lb-last-updated"></p>
+  </div>
+
+  <!-- ═══ DEV PANEL ══════════════════════════════════════════════════════════ -->
+  <div id="dev-panel" class="hidden" style="position:fixed;bottom:20px;right:20px;z-index:100;
+       background:rgba(15,20,30,0.95);border:1px solid rgba(251,191,36,0.4);
+       border-radius:16px;padding:16px;display:none;flex-direction:column;gap:10px;min-width:220px;">
+    <div class="text-yellow-400 font-bold text-sm">⚙️ Dev Mode</div>
+    <div class="flex flex-col gap-1">
+      <label class="text-xs text-gray-400">Energy / sec (1 – 1,000,000)</label>
+      <input
+        id="dev-eps-input"
+        type="number" min="1" max="1000000" value="100"
+        class="px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm
+               focus:outline-none focus:border-yellow-400 tabular-nums"
+      />
+    </div>
+    <button
+      onclick="devSetEPS()"
+      class="py-2 rounded-lg bg-yellow-500 hover:bg-yellow-400 text-gray-950 font-bold text-sm transition"
+    >
+      Set EPS
+    </button>
+    <button
+      onclick="devClearEPS()"
+      class="py-2 rounded-lg bg-slate-600 hover:bg-slate-500 text-white text-sm transition"
+    >
+      Clear Override
+    </button>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/flowbite@2.3.0/dist/flowbite.min.js"></script>
@@ -138,12 +226,6 @@
       document.getElementById("view-shop").classList.add("flex");
     }
 
-    function showClicker() {
-      document.getElementById("view-shop").classList.add("hidden");
-      document.getElementById("view-shop").classList.remove("flex");
-      document.getElementById("view-clicker").classList.remove("hidden");
-    }
-
     // ─── handleClick ───────────────────────────────────────────────────────────
     function handleClick() {
       clickSound.currentTime = 0;
@@ -162,13 +244,14 @@
       owned[index] += 1;
       recalcEPS();
       updateDisplay();
+      submitScore();
     }
 
     // ─── recalcEPS ─────────────────────────────────────────────────────────────
+    let devEPSBonus = 0;
     function recalcEPS() {
-      energyPerSecond = UPGRADES.reduce(
-        (sum, u, i) => sum + owned[i] * u.perSecond, 0
-      );
+      const real = UPGRADES.reduce((sum, u, i) => sum + owned[i] * u.perSecond, 0);
+      energyPerSecond = real + devEPSBonus;
     }
 
     // ─── tick ──────────────────────────────────────────────────────────────────
@@ -268,7 +351,7 @@
 
     // ─── Save / Load ───────────────────────────────────────────────────────────
     function saveGame() {
-      localStorage.setItem("starforge_save", JSON.stringify({ energy, owned, rebirthCount }));
+      localStorage.setItem("starforge_save", JSON.stringify({ energy, owned, rebirthCount, devEPSBonus }));
     }
 
     function loadGame() {
@@ -277,16 +360,143 @@
       const save = JSON.parse(raw);
       energy = save.energy ?? 0;
       rebirthCount = save.rebirthCount ?? 0;
+      devEPSBonus = save.devEPSBonus ?? 0;
       save.owned.forEach((n, i) => { if (i < owned.length) owned[i] = n; });
       recalcEPS();
+    }
+
+    // ─── Firebase ──────────────────────────────────────────────────────────────
+    const firebaseConfig = {
+      apiKey: "AIzaSyAG_BsKiZkMcWXjjBJ1nDEVivLiQRnygPE",
+      authDomain: "starforge-83eab.firebaseapp.com",
+      projectId: "starforge-83eab",
+      storageBucket: "starforge-83eab.firebasestorage.app",
+      messagingSenderId: "286371078416",
+      appId: "1:286371078416:web:21ed3fa1cf26ad38758595"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // ─── Username ──────────────────────────────────────────────────────────────
+    let username = localStorage.getItem("starforge_username") || "";
+
+    function setupUsername() {
+      if (!username) {
+        document.getElementById("username-modal").classList.remove("hidden");
+        document.getElementById("username-input").focus();
+      }
+    }
+
+    function confirmUsername() {
+      const val = document.getElementById("username-input").value.trim();
+      if (!val) return;
+      username = val;
+      localStorage.setItem("starforge_username", username);
+      document.getElementById("username-modal").classList.add("hidden");
+    }
+
+    document.getElementById("username-input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") confirmUsername();
+    });
+
+    // ─── Score submission ──────────────────────────────────────────────────────
+    function submitScore() {
+      if (!username || energyPerSecond <= 0) return;
+      db.collection("leaderboard").doc(username).set({
+        username,
+        eps: energyPerSecond,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).catch(() => {});
+    }
+
+    // ─── Leaderboard view ──────────────────────────────────────────────────────
+    function showLeaderboard() {
+      document.getElementById("view-clicker").classList.add("hidden");
+      document.getElementById("view-leaderboard").classList.remove("hidden");
+      document.getElementById("view-leaderboard").classList.add("flex");
+      fetchLeaderboard();
+    }
+
+    function showClicker() {
+      document.getElementById("view-shop").classList.add("hidden");
+      document.getElementById("view-shop").classList.remove("flex");
+      document.getElementById("view-leaderboard").classList.add("hidden");
+      document.getElementById("view-leaderboard").classList.remove("flex");
+      document.getElementById("view-clicker").classList.remove("hidden");
+    }
+
+    async function fetchLeaderboard() {
+      const list = document.getElementById("leaderboard-list");
+      list.innerHTML = `<p class="text-center text-gray-400 py-8">Loading...</p>`;
+      try {
+        const timeout = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("timeout")), 8000)
+        );
+        const snap = await Promise.race([
+          db.collection("leaderboard").orderBy("eps", "desc").limit(10).get(),
+          timeout
+        ]);
+        if (snap.empty) {
+          list.innerHTML = `<p class="text-center text-gray-400 py-8">No entries yet — be the first!</p>`;
+          return;
+        }
+        const medals = ["lb-gold", "lb-silver", "lb-bronze"];
+        list.innerHTML = snap.docs.map((doc, i) => {
+          const d = doc.data();
+          const colorClass = medals[i] || "text-gray-300";
+          const rank = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i + 1}`;
+          const isMe = d.username === username;
+          return `
+            <div class="flex items-center justify-between bg-white/5 border ${isMe ? "border-yellow-400/60" : "border-white/10"}
+                        rounded-2xl px-5 py-4 gap-4">
+              <span class="text-2xl w-8 text-center">${rank}</span>
+              <span class="flex-1 font-semibold ${colorClass} truncate">${d.username}${isMe ? " (you)" : ""}</span>
+              <span class="text-yellow-300 font-bold tabular-nums">${Number(d.eps).toLocaleString(undefined, {maximumFractionDigits: 1})}/s</span>
+            </div>`;
+        }).join("");
+        const now = new Date();
+        document.getElementById("lb-last-updated").textContent =
+          `Updated ${now.toLocaleTimeString()}`;
+      } catch (e) {
+        const msg = e.message === "timeout"
+          ? "Timed out — check Firestore security rules (reads must be allowed)."
+          : `Error: ${e.message}`;
+        list.innerHTML = `<p class="text-center text-red-400 py-8">${msg}</p>`;
+      }
+    }
+
+    // ─── Dev mode ─────────────────────────────────────────────────────────────
+    const DEV_MODE = new URLSearchParams(window.location.search).has("dev");
+
+    function devSetEPS() {
+      const target = Math.min(1_000_000, Math.max(1, Number(document.getElementById("dev-eps-input").value) || 1));
+      const real = UPGRADES.reduce((sum, u, i) => sum + owned[i] * u.perSecond, 0);
+      devEPSBonus = Math.max(0, target - real);
+      recalcEPS();
+      updateDisplay();
+    }
+
+    function devClearEPS() {
+      devEPSBonus = 0;
+      recalcEPS();
+      updateDisplay();
+    }
+
+    if (DEV_MODE) {
+      const panel = document.getElementById("dev-panel");
+      panel.classList.remove("hidden");
+      panel.style.display = "flex";
     }
 
     // ─── Init ──────────────────────────────────────────────────────────────────
     loadGame();
     renderShop();
     updateDisplay();
+    setupUsername();
+    submitScore();
     setInterval(tick, 100);
     setInterval(saveGame, 10_000);
+    setInterval(submitScore, 30_000);
     window.addEventListener("beforeunload", saveGame);
   </script>
 </body>
