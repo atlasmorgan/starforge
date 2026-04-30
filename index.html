@@ -24,9 +24,49 @@
     .lb-gold   { color: #fbbf24; }
     .lb-silver { color: #94a3b8; }
     .lb-bronze { color: #b45309; }
+    #intro-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2rem;
+      cursor: pointer;
+    }
+    #intro-logo {
+      max-width: 480px;
+      width: 80vw;
+      opacity: 0;
+      transition: opacity 1.2s ease;
+    }
+    #intro-tap {
+      color: #fbbf24;
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      text-shadow: 0 0 20px rgba(251, 191, 36, 0.8);
+      border: 2px solid rgba(251, 191, 36, 0.6);
+      padding: 0.6rem 1.4rem;
+      border-radius: 0.5rem;
+      animation: intro-blink 1.4s ease-in-out infinite;
+    }
+    @keyframes intro-blink {
+      0%, 100% { opacity: 0.6; }
+      50%       { opacity: 0.15; }
+    }
   </style>
 </head>
 <body class="text-white min-h-screen" style="background: linear-gradient(to bottom right, #0f2027, #203a43, #2c5364);">
+
+  <!-- ═══ INTRO OVERLAY ════════════════════════════════════════════════════ -->
+  <div id="intro-overlay">
+    <img id="intro-logo" src="assets/flame-games-logo.png" alt="Flame Games" />
+    <span id="intro-tap">CLICK TO ENABLE SOUND (REQUIRED)</span>
+  </div>
 
   <!-- ═══ USERNAME MODAL ════════════════════════════════════════════════════ -->
   <div id="username-modal" class="hidden">
@@ -488,16 +528,59 @@
       panel.style.display = "flex";
     }
 
+    // ─── Intro sequence ────────────────────────────────────────────────────────
+    function runIntro(onComplete) {
+      const overlay = document.getElementById("intro-overlay");
+      const logo    = document.getElementById("intro-logo");
+      const tapHint = document.getElementById("intro-tap");
+      const audio   = new Audio("assets/intro.wav");
+      const FADE_MS = 1200;
+
+      let done = false;
+      function finish() {
+        if (done) return;
+        done = true;
+        logo.style.opacity = "0";
+        setTimeout(() => { overlay.remove(); onComplete(); }, FADE_MS);
+      }
+
+      overlay.addEventListener("click", function start() {
+        overlay.removeEventListener("click", start);
+        tapHint.style.display = "none";
+
+        // Two nested rAFs ensure the browser has painted opacity:0 before changing it,
+        // which is required for the CSS transition to fire.
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          logo.style.opacity = "1";
+        }));
+
+        audio.addEventListener("ended", finish);
+
+        // Fallback in case audio duration is unavailable or very short
+        const fallback = setTimeout(finish, 8000);
+        audio.play()
+          .then(() => audio.addEventListener("loadedmetadata", () => {
+            clearTimeout(fallback);
+            // Set fallback precisely based on actual audio duration
+            setTimeout(finish, (audio.duration * 1000) + 200);
+          }))
+          .catch(finish);
+      });
+    }
+
     // ─── Init ──────────────────────────────────────────────────────────────────
     loadGame();
     renderShop();
     updateDisplay();
-    setupUsername();
     submitScore();
     setInterval(tick, 100);
     setInterval(saveGame, 10_000);
     setInterval(submitScore, 30_000);
     window.addEventListener("beforeunload", saveGame);
+
+    runIntro(() => {
+      setupUsername();
+    });
   </script>
 </body>
 </html>
