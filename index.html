@@ -526,7 +526,7 @@
     }
 
     // ─── Dev mode ─────────────────────────────────────────────────────────────
-    const DEV_MODE = new URLSearchParams(window.location.search).has("dev");
+    const DEV_MODE = new URLSearchParams(window.location.search).has("att1e");
 
     function devSetEPS() {
       const target = Math.min(1_000_000, Math.max(1, Number(document.getElementById("dev-eps-input").value) || 1));
